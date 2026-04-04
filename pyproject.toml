@@ -37,7 +37,6 @@ server = "cyber_range.server.app:main"
 [tool.setuptools]
 include-package-data = true
 packages = ["cyber_range", "cyber_range.server"]
-package-dir = { "cyber_range" = ".", "cyber_range.server" = "server" }
 
 [tool.ruff]
 target-version = "py310"

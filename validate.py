@@ -31,7 +31,7 @@ p("=" * 60)
 p("\n--- Structure ---")
 
 check("openenv.yaml exists", 
-      os.path.isfile("cyber_range/openenv.yaml"))
+      os.path.isfile("openenv.yaml"))
 
 check("models.py exists", 
       os.path.isfile("cyber_range/models.py"))
@@ -55,15 +55,15 @@ check("inference.py in root",
       os.path.isfile("inference.py"))
 
 check("README.md exists",
-      os.path.isfile("cyber_range/README.md"))
+      os.path.isfile("README.md"))
 
 check("pyproject.toml exists",
-      os.path.isfile("cyber_range/pyproject.toml"))
+      os.path.isfile("pyproject.toml"))
 
 # 2. OPENENV.YAML VALIDATION
 p("\n--- openenv.yaml ---")
 import yaml
-with open("cyber_range/openenv.yaml") as f:
+with open("openenv.yaml") as f:
     config = yaml.safe_load(f)
 
 check("spec_version present", "spec_version" in config, str(config.get("spec_version")))
