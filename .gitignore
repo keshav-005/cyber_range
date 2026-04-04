@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# Temp / debug outputs
+*.log
+*.txt
+!requirements.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
+
+# Episode eval outputs (generated at runtime)
+cyber_range/outputs/evals/*.json
