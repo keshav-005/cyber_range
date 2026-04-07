@@ -281,25 +281,26 @@ def run_scenario(
     and returns the grader scores (0.0-1.0).
     """
     task_name, difficulty = TASKS[task_id]
-    print(f"\n{'='*60}")
-    print(f"  SCENARIO: {task_name} [{difficulty}]")
-    print(f"{'='*60}")
+    print(f"\n{'='*60}", flush=True)
+    print(f"  SCENARIO: {task_name} [{difficulty}]", flush=True)
+    print(f"{'='*60}", flush=True)
 
     # Create fresh environment (in-process, no server needed)
     env = CyberRangeEnvironment()
     obs = env.reset(task_id=task_id, seed=SEED)
-    
-    print("START")
+
+    # Structured output: [START] block (required by OpenEnv validator)
+    print(f"[START] task={task_id}", flush=True)
 
     metadata = obs.metadata or {}
     scenario = metadata.get("scenario", {})
     max_steps = scenario.get("max_steps", 20)
     alerts = metadata.get("pending_alerts", [])
 
-    print(f"  Max steps: {max_steps}")
-    print(f"  Initial alerts: {len(alerts)}")
-    print(f"  Description: {scenario.get('description', 'N/A')[:100]}...")
-    print()
+    print(f"  Max steps: {max_steps}", flush=True)
+    print(f"  Initial alerts: {len(alerts)}", flush=True)
+    print(f"  Description: {scenario.get('description', 'N/A')[:100]}...", flush=True)
+    print(flush=True)
 
     # Initialize agent
     heuristic = HeuristicAgent(initial_alerts=alerts, initial_topology=metadata.get("network_topology", []))
@@ -328,7 +329,7 @@ def run_scenario(
                 response_text = completion.choices[0].message.content or ""
                 tool_name, tool_args = parse_tool_call(response_text)
             except Exception as exc:
-                print(f"  [LLM fallback] {type(exc).__name__}: {exc}")
+                print(f"  [LLM fallback] {type(exc).__name__}: {exc}", flush=True)
                 tool_name, tool_args = heuristic.decide(last_tool_result, alerts)
                 response_text = f"TOOL: {tool_name}\nARGS: {json.dumps(tool_args)}"
         else:
@@ -340,7 +341,7 @@ def run_scenario(
         try:
             obs = env.step(CallToolAction(tool_name=tool_name, arguments=tool_args))
         except Exception as exc:
-            print(f"  [Tool error] {tool_name}: {exc}")
+            print(f"  [Tool error] {tool_name}: {exc}", flush=True)
             obs = env.step(CallToolAction(tool_name="observe_network", arguments={}))
 
         # Extract result from CallToolObservation
@@ -369,10 +370,10 @@ def run_scenario(
         else:
             last_tool_result = {}
 
-        # Log
-        print("STEP")
-        reward_str = f"  reward={reward:+.2f}" if reward else ""
-        print(f"  Step {step}: {tool_name}({tool_args}){reward_str}")
+        # Structured output: [STEP] block (required by OpenEnv validator)
+        reward_val = reward if reward else 0.0
+        print(f"[STEP] step={step} reward={reward_val:.4f}", flush=True)
+        print(f"  Action: {tool_name}({tool_args})", flush=True)
 
         # Track history for LLM context
         history.append({
@@ -382,20 +383,23 @@ def run_scenario(
 
         # Check episode end
         if done:
-            print(f"  Episode ended at step {step}.")
+            print(f"  Episode ended at step {step}.", flush=True)
             break
 
-    print("END")
     # Get grader result from state
     state = env.state
     grader_result = getattr(state, "grader_result", None) or {}
 
-    # Print results
+    # Structured output: [END] block (required by OpenEnv validator)
     final_score = grader_result.get("final_score", 0.0)
-    print(f"\n  Final Score: {final_score}")
+    total_steps = state.step_count if hasattr(state, 'step_count') else step
+    print(f"[END] task={task_id} score={final_score:.4f} steps={total_steps}", flush=True)
+
+    # Additional detail logging
+    print(f"  Final Score: {final_score}", flush=True)
     details = grader_result.get("details", {})
     for k, v in details.items():
-        print(f"    {k}: {v}")
+        print(f"    {k}: {v}", flush=True)
 
     return grader_result
 
@@ -407,20 +411,20 @@ def main() -> None:
     """Run the LLM agent across all 5 CyberRange scenarios."""
     start_time = time.time()
 
-    print("=" * 60)
-    print("  CyberRange Inference - SOC Analyst Agent")
-    print("=" * 60)
-    print(f"  Model:  {MODEL_NAME}")
-    print(f"  API:    {API_BASE_URL}")
-    print(f"  Mode:   {'LLM' if API_KEY else 'Heuristic (no API key)'}")
-    print(f"  Seed:   {SEED}")
-    print()
+    print("=" * 60, flush=True)
+    print("  CyberRange Inference - SOC Analyst Agent", flush=True)
+    print("=" * 60, flush=True)
+    print(f"  Model:  {MODEL_NAME}", flush=True)
+    print(f"  API:    {API_BASE_URL}", flush=True)
+    print(f"  Mode:   {'LLM' if API_KEY else 'Heuristic (no API key)'}", flush=True)
+    print(f"  Seed:   {SEED}", flush=True)
+    print(flush=True)
 
     use_llm = bool(API_KEY)
     if not use_llm:
-        print("  NOTE: No API key found (set HF_TOKEN or API_KEY).")
-        print("  Running with heuristic agent to produce baseline scores.")
-        print()
+        print("  NOTE: No API key found (set HF_TOKEN or API_KEY).", flush=True)
+        print("  Running with heuristic agent to produce baseline scores.", flush=True)
+        print(flush=True)
 
     # Create OpenAI client (required by spec, even if API key is missing)
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "not-set")
@@ -432,24 +436,27 @@ def main() -> None:
             result = run_scenario(client, task_id, use_llm=use_llm)
             results[task_id] = result
         except Exception as exc:
-            print(f"\n  ERROR in {task_id}: {exc}")
+            print(f"\n  ERROR in {task_id}: {exc}", flush=True)
+            # Even on error, emit [START]/[END] so validator can parse
+            print(f"[START] task={task_id}", flush=True)
+            print(f"[END] task={task_id} score=0.0000 steps=0", flush=True)
             results[task_id] = {"final_score": 0.0, "error": str(exc)}
 
     # ===== Summary =====
     elapsed = time.time() - start_time
-    print(f"\n{'='*60}")
-    print("  FINAL RESULTS")
-    print(f"{'='*60}")
+    print(f"\n{'='*60}", flush=True)
+    print("  FINAL RESULTS", flush=True)
+    print(f"{'='*60}", flush=True)
 
     for task_id, result in results.items():
         score = result.get("final_score", 0.0)
-        print(f"  {task_id:<25} score={score:.3f}")
+        print(f"  {task_id:<25} score={score:.3f}", flush=True)
 
     avg_score = sum(r.get("final_score", 0.0) for r in results.values()) / max(len(results), 1)
-    print(f"\n  Average Score: {avg_score:.3f}")
-    print(f"  Runtime: {elapsed:.1f}s")
-    print(f"  Seed: {SEED} (reproducible)")
-    print()
+    print(f"\n  Average Score: {avg_score:.3f}", flush=True)
+    print(f"  Runtime: {elapsed:.1f}s", flush=True)
+    print(f"  Seed: {SEED} (reproducible)", flush=True)
+    print(flush=True)
 
 
 if __name__ == "__main__":
