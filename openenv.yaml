@@ -4,7 +4,7 @@ spec_version: 1
 name: cyber_range
 type: space
 runtime: fastapi
-app: cyber_range.server.app:app
+app: server.app:app
 port: 8000
 
 metadata:
