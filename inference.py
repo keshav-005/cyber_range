@@ -288,6 +288,8 @@ def run_scenario(
     # Create fresh environment (in-process, no server needed)
     env = CyberRangeEnvironment()
     obs = env.reset(task_id=task_id, seed=SEED)
+    
+    print("START")
 
     metadata = obs.metadata or {}
     scenario = metadata.get("scenario", {})
@@ -368,6 +370,7 @@ def run_scenario(
             last_tool_result = {}
 
         # Log
+        print("STEP")
         reward_str = f"  reward={reward:+.2f}" if reward else ""
         print(f"  Step {step}: {tool_name}({tool_args}){reward_str}")
 
@@ -382,6 +385,7 @@ def run_scenario(
             print(f"  Episode ended at step {step}.")
             break
 
+    print("END")
     # Get grader result from state
     state = env.state
     grader_result = getattr(state, "grader_result", None) or {}
