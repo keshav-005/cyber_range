@@ -2411,6 +2411,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+demo = [
+    { name = "gradio" },
+]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -2431,6 +2434,7 @@ training = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fastmcp", specifier = ">=2.0.0" },
+    { name = "gradio", marker = "extra == 'demo'", specifier = ">=4.0.0" },
     { name = "gymnasium", marker = "extra == 'training'", specifier = ">=0.29.1" },
     { name = "openai", marker = "extra == 'inference'", specifier = ">=1.0.0" },
     { name = "openenv-core", extras = ["core"], specifier = ">=0.2.2" },
@@ -2445,7 +2449,7 @@ requires-dist = [
     { name = "trl", marker = "extra == 'training'", specifier = ">=0.15.0" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]
-provides-extras = ["dev", "inference", "training"]
+provides-extras = ["dev", "inference", "demo", "training"]
 
 [[package]]
 name = "opentelemetry-api"
