@@ -29,6 +29,12 @@ dev = [
 ]
 inference = [
     "openai>=1.0.0",
+    "rich>=13.0.0",
+]
+training = [
+    "rich>=13.0.0",
+    "gymnasium>=0.29.1",
+    "trl>=0.15.0",
 ]
 
 [project.scripts]
