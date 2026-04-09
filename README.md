@@ -243,6 +243,31 @@ trainer.train()
 python train_baseline.py                # Evaluate heuristic + show GRPO setup
 python train_baseline.py --eval-only    # Evaluation only
 ```
+---
+
+## Gymnasium Integration
+
+CyberRange supports standard RL training pipelines via a Gymnasium-compatible wrapper:
+
+```python
+from cyber_range.gym_wrapper import make_env
+
+env = make_env(task_id="apt_lateral_movement", seed=42)
+obs_text, info = env.reset()
+
+# obs_text is natural language — perfect for LLM policies
+# action is a JSON string — parsed automatically
+obs_text, reward, terminated, truncated, info = env.step(
+    '{"tool": "investigate_alert", "args": {"alert_id": "ALT-0001"}}'
+)
+
+print(f"Reward: {reward}, Score: {info.get('final_score', 'N/A')}")
+```
+
+Compatible with:
+- **TRL** (Transformer Reinforcement Learning) — GRPO, PPO
+- **RLlib** / **OpenRL** (via Gymnasium interface)
+- **Stable Baselines 3** (with Text observation wrapper)
 
 ---
 

