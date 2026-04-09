@@ -60,25 +60,33 @@ You are an expert Security Operations Center (SOC) analyst defending an enterpri
 You interact with the CyberRange environment through tool calls.
 
 AVAILABLE TOOLS:
-- observe_network() -> Get full network state, alerts, and metrics. Call this FIRST.
-- investigate_alert(alert_id="ALT-XXXX") -> Deep-dive into an alert.
-- isolate_host(node_id="xxx-xx") -> Quarantine a compromised host. WARNING: isolating healthy hosts is penalized.
-- block_ip(ip_address="x.x.x.x") -> Block an external attacker IP at the firewall.
-- run_forensics(node_id="xxx-xx") -> Run forensics on a host. Expensive but reveals evidence.
-- deploy_patch(node_id="xxx-xx") -> Patch known vulnerabilities on a host.
-- restore_backup(node_id="xxx-xx") -> Restore a compromised host from backup.
-- dismiss_alert(alert_id="ALT-XXXX") -> Dismiss an alert as a false positive.
-- deploy_honeypot() -> Deploy a honeypot to gather attacker intel. One use only.
-- escalate_incident(description="...") -> Escalate to senior analyst. Safe but costly.
+- observe_network() → Get full network state, alerts, and metrics. Call this FIRST.
+- investigate_alert(alert_id="ALT-XXXX") → Deep-dive into an alert.
+- isolate_host(node_id="xxx-xx") → Quarantine a compromised host. WARNING: isolating healthy hosts is penalized.
+- block_ip(ip_address="x.x.x.x") → Block an external attacker IP at the firewall.
+- run_forensics(node_id="xxx-xx") → Run forensics on a host. Expensive but reveals evidence.
+- deploy_patch(node_id="xxx-xx") → Patch known vulnerabilities on a host.
+- restore_backup(node_id="xxx-xx") → Restore a compromised host from backup. This is the ONLY way to fully eradicate persistent threats.
+- dismiss_alert(alert_id="ALT-XXXX") → Dismiss an alert as a false positive.
+- deploy_honeypot() → Deploy a honeypot to gather attacker intel. One use only.
+- escalate_incident(description="...") → Escalate to senior analyst. Safe but costly.
 
-STRATEGY:
-1. Always start with observe_network() to assess the situation.
-2. Investigate alerts BEFORE taking drastic action (isolate/block).
-3. Read the `forensic_evidence` returned by investigations carefully! If the evidence mentions "benign" or "routine system processes", the alert is a false positive. Dismiss it.
-4. If the `forensic_evidence` confirms "malicious activity" or "unauthorized access", the threat is REAL. 
-5. Block external attacker IPs when identified from investigation results.
-6. Isolate truly compromised hosts only AFTER confirming via investigation/forensics.
-7. Prioritize critical infrastructure: domain controller, database, firewall.
+THINKING FRAMEWORK (Chain-of-Thought):
+Before each action, reason through these steps:
+1. ASSESS: What is the current threat level? How many unresolved alerts remain?
+2. PRIORITIZE: Which alert/threat has the highest severity × confidence?
+3. CONSIDER: What MITRE ATT&CK tactic is the attacker likely using? (e.g., T1190 Initial Access, T1021 Lateral Movement)
+4. PLAN: What is the optimal next action given budget, step count, and risk?
+5. ACT: Execute the single best action.
+
+KEY STRATEGIES:
+- Evidence before action: Investigate alerts BEFORE taking drastic containment steps.
+- Read forensic_evidence carefully: "benign" or "routine" = false positive → dismiss it.
+  "malicious activity" or "unauthorized access" = real threat → contain it.
+- Adaptive adversaries rotate C2 IPs when you block them. Watch for NEW alerts after blocking.
+- Patching alone does NOT remove persistent threats. Use restore_backup for full eradication.
+- Prioritize critical infrastructure: domain controller (dc-01), database (db-01), firewall (fw-01).
+- Deploy honeypot early in complex scenarios for intelligence gathering.
 
 RESPONSE FORMAT - respond with EXACTLY one tool call:
 TOOL: tool_name
@@ -312,11 +320,19 @@ def run_scenario(
         if use_llm:
             # Build LLM prompt
             user_prompt = format_observation(last_tool_result, step, max_steps)
+
+            # Include MITRE context for smarter reasoning
+            mitre_context = ""
+            if isinstance(last_tool_result, dict):
+                events = last_tool_result.get("recent_events", [])
+                if events:
+                    mitre_context = f"\n\nReason about patterns: {events[-2:]}"
+
             messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-            for h in history[-3:]:
+            for h in history[-4:]:  # Slightly larger context window
                 messages.append({"role": "user", "content": h["prompt"]})
                 messages.append({"role": "assistant", "content": h["response"]})
-            messages.append({"role": "user", "content": user_prompt})
+            messages.append({"role": "user", "content": user_prompt + mitre_context})
 
             try:
                 completion = client.chat.completions.create(

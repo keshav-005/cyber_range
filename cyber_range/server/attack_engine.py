@@ -33,6 +33,8 @@ SCENARIOS: dict[str, ScenarioConfig] = {
         threat_count=1,
         false_positive_count=1,
         max_steps=15,
+        adversary_behavior="static",
+        mitre_techniques_covered=["T1110.001"],
         attack_phases=[
             AttackPhase(
                 phase_id="bf-01",
@@ -42,6 +44,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.BRUTE_FORCE,
                 steps_to_complete=8,
                 is_active=True,
+                mitre_technique_id="T1110.001",
+                mitre_technique_name="Brute Force: Password Guessing",
+                mitre_tactic="credential-access",
             ),
         ],
         initial_compromised_nodes=[],
@@ -61,6 +66,8 @@ SCENARIOS: dict[str, ScenarioConfig] = {
         threat_count=3,
         false_positive_count=2,
         max_steps=25,
+        adversary_behavior="evasive",
+        mitre_techniques_covered=["T1566.001", "T1204.002", "T1021.002"],
         attack_phases=[
             AttackPhase(
                 phase_id="phish-01",
@@ -70,6 +77,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.PHISHING,
                 steps_to_complete=6,
                 is_active=True,
+                mitre_technique_id="T1566.001",
+                mitre_technique_name="Phishing: Spearphishing Attachment",
+                mitre_tactic="initial-access",
             ),
             AttackPhase(
                 phase_id="phish-02",
@@ -79,16 +89,22 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.PHISHING,
                 steps_to_complete=6,
                 is_active=True,
+                mitre_technique_id="T1204.002",
+                mitre_technique_name="User Execution: Malicious File",
+                mitre_tactic="execution",
             ),
             AttackPhase(
                 phase_id="phish-03",
                 name="Lateral Movement Attempt",
-                description="Malware attempts to spread from ws-01 to app-01",
+                description="Malware attempts to spread from ws-01 to app-01 via SMB",
                 target_node_id="app-01",
                 attack_type=AlertType.LATERAL_MOVEMENT,
                 steps_to_complete=5,
                 is_active=False,
                 prerequisite_phase_id="phish-01",
+                mitre_technique_id="T1021.002",
+                mitre_technique_name="Remote Services: SMB/Windows Admin Shares",
+                mitre_tactic="lateral-movement",
             ),
         ],
         initial_compromised_nodes=["ws-01", "ws-02"],
@@ -103,62 +119,82 @@ SCENARIOS: dict[str, ScenarioConfig] = {
             "credential harvesting → lateral movement to domain controller → privilege "
             "escalation → data exfiltration from the production database. "
             "You must trace the full kill chain, contain the threat at each stage, "
-            "and prevent data exfiltration. Mixed alerts include false positives to test triage."
+            "and prevent data exfiltration. The adversary uses C2 IP rotation to evade blocking."
         ),
         difficulty=Difficulty.HARD,
         threat_count=5,
         false_positive_count=3,
         max_steps=35,
+        adversary_behavior="evasive",
+        mitre_techniques_covered=["T1190", "T1003.001", "T1021.002", "T1078.002", "T1041"],
         attack_phases=[
             AttackPhase(
                 phase_id="apt-01",
                 name="Initial Access via Web Server",
-                description="APT exploited vulnerability on web-01, reverse shell established",
+                description="APT exploited CVE-2024-1234 on web-01, reverse shell established",
                 target_node_id="web-01",
                 attack_type=AlertType.INTRUSION,
                 steps_to_complete=3,
                 is_active=True,
+                mitre_technique_id="T1190",
+                mitre_technique_name="Exploit Public-Facing Application",
+                mitre_tactic="initial-access",
+                c2_ip_pool=["91.219.236.166", "198.51.100.23"],
             ),
             AttackPhase(
                 phase_id="apt-02",
                 name="Credential Harvesting",
-                description="Dumping credentials from web-01 via Mimikatz",
+                description="Dumping credentials from web-01 via Mimikatz (LSASS memory)",
                 target_node_id="web-01",
                 attack_type=AlertType.PRIVILEGE_ESCALATION,
                 steps_to_complete=4,
                 is_active=False,
                 prerequisite_phase_id="apt-01",
+                mitre_technique_id="T1003.001",
+                mitre_technique_name="OS Credential Dumping: LSASS Memory",
+                mitre_tactic="credential-access",
+                recompromise_delay=3,
             ),
             AttackPhase(
                 phase_id="apt-03",
                 name="Lateral Movement to DC",
-                description="Using stolen credentials to move to domain controller dc-01",
+                description="Using stolen credentials to move to domain controller dc-01 via SMB",
                 target_node_id="dc-01",
                 attack_type=AlertType.LATERAL_MOVEMENT,
                 steps_to_complete=5,
                 is_active=False,
                 prerequisite_phase_id="apt-02",
+                mitre_technique_id="T1021.002",
+                mitre_technique_name="Remote Services: SMB/Windows Admin Shares",
+                mitre_tactic="lateral-movement",
             ),
             AttackPhase(
                 phase_id="apt-04",
                 name="Privilege Escalation on DC",
-                description="Elevating to Domain Admin on dc-01",
+                description="Elevating to Domain Admin on dc-01 via token impersonation",
                 target_node_id="dc-01",
                 attack_type=AlertType.PRIVILEGE_ESCALATION,
                 steps_to_complete=3,
                 is_active=False,
                 prerequisite_phase_id="apt-03",
+                mitre_technique_id="T1078.002",
+                mitre_technique_name="Valid Accounts: Domain Accounts",
+                mitre_tactic="privilege-escalation",
             ),
             AttackPhase(
                 phase_id="apt-05",
                 name="Data Exfiltration",
-                description="Exfiltrating sensitive data from db-01 to external C2",
+                description="Exfiltrating sensitive data from db-01 to external C2 over HTTPS",
                 target_node_id="db-01",
                 attack_type=AlertType.EXFILTRATION,
                 steps_to_complete=6,
                 is_active=False,
                 exfiltration_rate_mb=5.0,
                 prerequisite_phase_id="apt-04",
+                mitre_technique_id="T1041",
+                mitre_technique_name="Exfiltration Over C2 Channel",
+                mitre_tactic="exfiltration",
+                c2_ip_pool=["203.0.113.45", "198.51.100.99"],
             ),
         ],
         initial_compromised_nodes=["web-01"],
@@ -179,6 +215,8 @@ SCENARIOS: dict[str, ScenarioConfig] = {
         threat_count=4,
         false_positive_count=1,
         max_steps=20,
+        adversary_behavior="persistent",
+        mitre_techniques_covered=["T1486", "T1021.002", "T1490", "T1489"],
         attack_phases=[
             AttackPhase(
                 phase_id="ransom-01",
@@ -188,6 +226,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.RANSOMWARE,
                 steps_to_complete=2,
                 is_active=True,
+                mitre_technique_id="T1486",
+                mitre_technique_name="Data Encrypted for Impact",
+                mitre_tactic="impact",
             ),
             AttackPhase(
                 phase_id="ransom-02",
@@ -198,6 +239,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 steps_to_complete=3,
                 is_active=False,
                 prerequisite_phase_id="ransom-01",
+                mitre_technique_id="T1021.002",
+                mitre_technique_name="Remote Services: SMB/Windows Admin Shares",
+                mitre_tactic="lateral-movement",
             ),
             AttackPhase(
                 phase_id="ransom-03",
@@ -208,6 +252,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 steps_to_complete=3,
                 is_active=False,
                 prerequisite_phase_id="ransom-02",
+                mitre_technique_id="T1490",
+                mitre_technique_name="Inhibit System Recovery",
+                mitre_tactic="impact",
             ),
             AttackPhase(
                 phase_id="ransom-04",
@@ -218,6 +265,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 steps_to_complete=4,
                 is_active=False,
                 prerequisite_phase_id="ransom-03",
+                mitre_technique_id="T1489",
+                mitre_technique_name="Service Stop",
+                mitre_tactic="impact",
             ),
         ],
         initial_compromised_nodes=["ws-01"],
@@ -232,13 +282,18 @@ SCENARIOS: dict[str, ScenarioConfig] = {
             "and financial data to a personal cloud storage account. Meanwhile, an "
             "external APT group has compromised the mail server (mail-01) through a "
             "spear-phishing attack and is moving laterally toward the domain controller. "
-            "You must detect, prioritize, and contain BOTH threats while managing limited "
-            "resources and dealing with 4 false positive alerts designed to waste your time."
+            "The adversary adapts: blocking IPs triggers C2 rotation, and patching without "
+            "full restoration allows re-compromise. Four false positive alerts add noise."
         ),
         difficulty=Difficulty.NIGHTMARE,
         threat_count=7,
         false_positive_count=4,
         max_steps=45,
+        adversary_behavior="adaptive",
+        mitre_techniques_covered=[
+            "T1567.002", "T1074.001", "T1566.001", "T1003.001",
+            "T1021.002", "T1078.002", "T1041",
+        ],
         attack_phases=[
             # === Insider Threat Chain ===
             AttackPhase(
@@ -249,6 +304,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.ANOMALOUS_TRAFFIC,
                 steps_to_complete=5,
                 is_active=True,
+                mitre_technique_id="T1074.001",
+                mitre_technique_name="Data Staged: Local Data Staging",
+                mitre_tactic="collection",
             ),
             AttackPhase(
                 phase_id="insider-02",
@@ -260,6 +318,9 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 exfiltration_rate_mb=3.0,
                 is_active=False,
                 prerequisite_phase_id="insider-01",
+                mitre_technique_id="T1567.002",
+                mitre_technique_name="Exfiltration to Cloud Storage",
+                mitre_tactic="exfiltration",
             ),
             # === External APT Chain ===
             AttackPhase(
@@ -270,26 +331,37 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 attack_type=AlertType.PHISHING,
                 steps_to_complete=3,
                 is_active=True,
+                mitre_technique_id="T1566.001",
+                mitre_technique_name="Phishing: Spearphishing Attachment",
+                mitre_tactic="initial-access",
+                c2_ip_pool=["91.219.236.166", "198.51.100.23", "203.0.113.77"],
             ),
             AttackPhase(
                 phase_id="ext-apt-02",
                 name="Credential Harvesting from Mail",
-                description="Extracting cached credentials from mail-01",
+                description="Extracting cached credentials from mail-01 via LSASS dump",
                 target_node_id="mail-01",
                 attack_type=AlertType.PRIVILEGE_ESCALATION,
                 steps_to_complete=4,
                 is_active=False,
                 prerequisite_phase_id="ext-apt-01",
+                mitre_technique_id="T1003.001",
+                mitre_technique_name="OS Credential Dumping: LSASS Memory",
+                mitre_tactic="credential-access",
+                recompromise_delay=3,
             ),
             AttackPhase(
                 phase_id="ext-apt-03",
                 name="Lateral Movement to DC",
-                description="Using stolen creds to access domain controller dc-01",
+                description="Using stolen creds to access domain controller dc-01 via SMB",
                 target_node_id="dc-01",
                 attack_type=AlertType.LATERAL_MOVEMENT,
                 steps_to_complete=5,
                 is_active=False,
                 prerequisite_phase_id="ext-apt-02",
+                mitre_technique_id="T1021.002",
+                mitre_technique_name="Remote Services: SMB/Windows Admin Shares",
+                mitre_tactic="lateral-movement",
             ),
             AttackPhase(
                 phase_id="ext-apt-04",
@@ -300,17 +372,24 @@ SCENARIOS: dict[str, ScenarioConfig] = {
                 steps_to_complete=3,
                 is_active=False,
                 prerequisite_phase_id="ext-apt-03",
+                mitre_technique_id="T1078.002",
+                mitre_technique_name="Valid Accounts: Domain Accounts",
+                mitre_tactic="privilege-escalation",
             ),
             AttackPhase(
                 phase_id="ext-apt-05",
                 name="Mass Data Exfiltration",
-                description="Exfiltrating entire database via domain admin access",
+                description="Exfiltrating entire database via domain admin access over C2",
                 target_node_id="db-01",
                 attack_type=AlertType.EXFILTRATION,
                 steps_to_complete=6,
                 exfiltration_rate_mb=10.0,
                 is_active=False,
                 prerequisite_phase_id="ext-apt-04",
+                mitre_technique_id="T1041",
+                mitre_technique_name="Exfiltration Over C2 Channel",
+                mitre_tactic="exfiltration",
+                c2_ip_pool=["203.0.113.45", "198.51.100.99"],
             ),
         ],
         initial_compromised_nodes=["mail-01"],
@@ -384,6 +463,11 @@ class AttackEngine:
                 steps_to_complete=p.steps_to_complete,
                 exfiltration_rate_mb=p.exfiltration_rate_mb,
                 is_active=p.is_active, prerequisite_phase_id=p.prerequisite_phase_id,
+                mitre_technique_id=p.mitre_technique_id,
+                mitre_technique_name=p.mitre_technique_name,
+                mitre_tactic=p.mitre_tactic,
+                c2_ip_pool=list(p.c2_ip_pool),
+                recompromise_delay=p.recompromise_delay,
             )
             for p in self.scenario.attack_phases
         ]
@@ -397,9 +481,14 @@ class AttackEngine:
 
         self._total_exfiltrated_mb = 0.0
         self._total_prevented_mb = 0.0
+        self._adversary_behavior = self.scenario.adversary_behavior
 
-        # Set attacker IPs
+        # Set attacker IPs (base pool + C2 rotation IPs from phases)
         self._attacker_ips = {"185.220.101.42", "94.232.46.19", "45.155.205.233"}
+        self._c2_rotation_pool: list[str] = []
+        for p in self.phases:
+            self._c2_rotation_pool.extend(p.c2_ip_pool)
+        self._active_c2_ip: Optional[str] = None  # Currently active rotated C2
 
         # Apply initial compromises
         for node_id in self.scenario.initial_compromised_nodes:
@@ -536,7 +625,41 @@ class AttackEngine:
 
             # Check if attacker IP is blocked for external attacks
             if phase.attack_type in (AlertType.BRUTE_FORCE, AlertType.INTRUSION):
-                if any(ip in network.blocked_ips for ip in self._attacker_ips):
+                blocked = any(ip in network.blocked_ips for ip in self._attacker_ips)
+                # Adaptive adversary: rotate to backup C2 IP if primary is blocked
+                if blocked and self._adversary_behavior in ("evasive", "adaptive"):
+                    if self._c2_rotation_pool:
+                        new_ip = self._c2_rotation_pool.pop(0)
+                        self._attacker_ips.add(new_ip)
+                        self._active_c2_ip = new_ip
+                        events.append(
+                            f"🔄 Adversary rotated C2 to {new_ip} after IP block detected "
+                            f"[MITRE: T1571 Non-Standard Port / T1090 Proxy]"
+                        )
+                        # Generate a new alert for the rotated C2
+                        if target_node:
+                            alert_id = network.generate_alert_id()
+                            network.add_alert(NetworkAlert(
+                                alert_id=alert_id,
+                                timestamp=float(network.elapsed_steps()),
+                                severity=AlertSeverity.HIGH,
+                                source_ip=new_ip,
+                                destination_ip=target_node.ip_address,
+                                alert_type=phase.attack_type,
+                                description=f"[HIGH] New C2 channel detected from {new_ip}",
+                                confidence=self._rng.uniform(0.65, 0.90),
+                                raw_log=f"ids: Connection from previously-unseen IP {new_ip} to {target_node.ip_address}:443",
+                                is_false_positive=False,
+                                related_node_id=phase.target_node_id,
+                                related_attack_phase=phase.phase_id,
+                            ))
+                    else:
+                        # No more C2 IPs to rotate to — contained
+                        phase.is_contained = True
+                        self.metrics.threats_neutralized += 1
+                        events.append(f"Attack phase '{phase.name}' contained — all C2 IPs exhausted.")
+                        continue
+                elif blocked:
                     phase.is_contained = True
                     self.metrics.threats_neutralized += 1
                     events.append(f"Attack phase '{phase.name}' contained — attacker IP blocked at firewall.")
@@ -750,6 +873,47 @@ class AttackEngine:
             "healthy_hosts_isolated": self.metrics.healthy_hosts_isolated,
             "steps_used": f"{steps_used}/{max_steps}",
             "difficulty": self.scenario.difficulty.value,
+            "adversary_behavior": self._adversary_behavior,
         }
 
+        # Include MITRE ATT&CK coverage metadata
+        scores["mitre_coverage"] = self.mitre_coverage_report()
+
         return scores
+
+    def mitre_coverage_report(self) -> dict:
+        """
+        Generate a MITRE ATT&CK coverage report for the current scenario.
+
+        Returns a dict mapping tactic → list of techniques tested,
+        enabling benchmarking against the ATT&CK framework.
+        """
+        if not self.scenario:
+            return {}
+
+        tactics: dict[str, list[dict]] = {}
+        for phase in self.phases:
+            if not phase.mitre_technique_id:
+                continue
+            tactic = phase.mitre_tactic or "unknown"
+            entry = {
+                "technique_id": phase.mitre_technique_id,
+                "technique_name": phase.mitre_technique_name,
+                "phase": phase.name,
+                "target": phase.target_node_id,
+                "status": (
+                    "contained" if phase.is_contained
+                    else "completed" if phase.is_completed
+                    else "active" if phase.is_active
+                    else "pending"
+                ),
+            }
+            tactics.setdefault(tactic, []).append(entry)
+
+        return {
+            "scenario_id": self.scenario.scenario_id,
+            "adversary_behavior": self._adversary_behavior,
+            "total_techniques": len(self.scenario.mitre_techniques_covered),
+            "technique_ids": self.scenario.mitre_techniques_covered,
+            "tactics_breakdown": tactics,
+        }

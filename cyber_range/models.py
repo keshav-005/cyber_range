@@ -82,6 +82,29 @@ class Difficulty(str, Enum):
     NIGHTMARE = "nightmare"
 
 
+class AdversaryBehavior(str, Enum):
+    """Adversary adaptation strategy."""
+    STATIC = "static"          # Fixed attack plan, no adaptation
+    EVASIVE = "evasive"        # Rotates C2 IPs when blocked, changes TTPs
+    PERSISTENT = "persistent"  # Re-compromises hosts if only patched (not restored)
+    ADAPTIVE = "adaptive"      # Full adaptation: evasion + persistence + decoy alerts
+
+
+class MitreTactic(str, Enum):
+    """MITRE ATT&CK Tactic categories."""
+    INITIAL_ACCESS = "initial-access"
+    EXECUTION = "execution"
+    PERSISTENCE = "persistence"
+    PRIVILEGE_ESCALATION = "privilege-escalation"
+    DEFENSE_EVASION = "defense-evasion"
+    CREDENTIAL_ACCESS = "credential-access"
+    DISCOVERY = "discovery"
+    LATERAL_MOVEMENT = "lateral-movement"
+    COLLECTION = "collection"
+    EXFILTRATION = "exfiltration"
+    IMPACT = "impact"
+
+
 
 @dataclass
 class NetworkNode:
@@ -153,7 +176,7 @@ class NetworkAlert:
 
 @dataclass
 class AttackPhase:
-    """A single phase in a multi-step attack chain."""
+    """A single phase in a multi-step attack chain, aligned to MITRE ATT&CK."""
     phase_id: str
     name: str
     description: str
@@ -166,6 +189,25 @@ class AttackPhase:
     is_completed: bool = False  # Attacker succeeded
     is_contained: bool = False  # Defender neutralized
     prerequisite_phase_id: Optional[str] = None  # Must complete before this activates
+    # MITRE ATT&CK alignment
+    mitre_technique_id: str = ""       # e.g. "T1190"
+    mitre_technique_name: str = ""     # e.g. "Exploit Public-Facing Application"
+    mitre_tactic: str = ""             # e.g. "initial-access"
+    # Adaptive adversary fields
+    c2_ip_pool: list[str] = field(default_factory=list)  # Backup C2 IPs for rotation
+    recompromise_delay: int = 0        # Steps before re-compromise if only patched
+    times_recompromised: int = 0       # Track persistence attempts
+
+
+@dataclass
+class ForensicArtifact:
+    """Structured forensic evidence from host analysis."""
+    process_tree: list[dict] = field(default_factory=list)       # Parent→child process chains
+    network_connections: list[dict] = field(default_factory=list) # Active connections with ports
+    registry_modifications: list[str] = field(default_factory=list)  # Windows registry changes
+    file_artifacts: list[dict] = field(default_factory=list)     # Modified files with hashes
+    memory_indicators: list[str] = field(default_factory=list)   # IOCs from memory analysis
+    mitre_techniques_observed: list[str] = field(default_factory=list)  # Detected ATT&CK techniques
 
 
 @dataclass
@@ -180,6 +222,8 @@ class ScenarioConfig:
     max_steps: int
     attack_phases: list[AttackPhase] = field(default_factory=list)
     initial_compromised_nodes: list[str] = field(default_factory=list)
+    adversary_behavior: str = "static"  # AdversaryBehavior value
+    mitre_techniques_covered: list[str] = field(default_factory=list)  # All MITRE IDs in scenario
 
 
 @dataclass
