@@ -135,7 +135,7 @@ class TestHeuristicAgent:
         agent = HeuristicAgent(initial_alerts=[], initial_topology=[])
         agent._step = 10  # Skip early phases
         agent._investigated_alerts = {"ALT-0001"}
-        agent._discovered_ips = ["203.0.113.5"]
+        agent._ips_to_block = ["203.0.113.5"]
 
         tool, args = agent.decide(None, [])
         assert tool == "block_ip"
@@ -148,8 +148,9 @@ class TestHeuristicAgent:
         agent = HeuristicAgent(initial_alerts=alerts, initial_topology=[])
         agent._step = 20  # Past investigation/blocking phases
         agent._investigated_alerts = {"ALT-FP1"}
-        agent._discovered_ips = []
+        agent._ips_to_block = []
         agent._blocked_ips = {"185.220.101.42", "94.232.46.19", "45.155.205.233"}
+        agent._confirmed_fps = ["ALT-FP1"]
 
         tool, args = agent.decide(None, [])
         assert tool == "dismiss_alert"
@@ -183,4 +184,4 @@ class TestHeuristicAgent:
         assert tool == "block_ip"
         assert args["ip_address"] == "203.0.113.99"
         # The compromised node should be queued for later isolation
-        assert "ws-01" in agent._discovered_compromised
+        assert "ws-01" in agent._nodes_to_isolate

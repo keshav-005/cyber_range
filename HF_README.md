@@ -27,10 +27,10 @@ CyberRange simulates a 12-node enterprise network under active cyber attack. An 
 
 | Feature | Details |
 |---------|---------|
-| **5 Scenarios** | Script Kiddie → Insider+APT (easy→nightmare) |
+| **6 Scenarios** | Script Kiddie → Supply Chain → Insider+APT (easy→nightmare) |
 | **10 SOC Tools** | observe, investigate, isolate, block, forensics, patch, restore, dismiss, honeypot, escalate |
 | **Adaptive Adversary** | 4 behavior modes: static, evasive, persistent, adaptive |
-| **MITRE ATT&CK** | 12 techniques across 8 tactics |
+| **MITRE ATT&CK** | 16 techniques across 8 tactics |
 | **Realistic Forensics** | Process trees, SHA-256 hashes, VirusTotal scores, Cobalt Strike signatures |
 | **Multi-Objective Grading** | Threats (35%) + FP handling (20%) + Data protection (20%) + Collateral (15%) + Efficiency (10%) |
 | **Gymnasium Wrapper** | Compatible with TRL, RLlib, Stable Baselines 3 |

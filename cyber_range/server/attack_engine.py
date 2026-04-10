@@ -394,6 +394,87 @@ SCENARIOS: dict[str, ScenarioConfig] = {
         ],
         initial_compromised_nodes=["mail-01"],
     ),
+
+    "supply_chain_compromise": ScenarioConfig(
+        scenario_id="supply_chain_compromise",
+        name="Supply Chain Compromise",
+        description=(
+            "A trusted software update for the application server (app-01) has been "
+            "trojaned by an advanced threat actor. The compromised update installed a "
+            "backdoor that is beaconing to C2 infrastructure. The attacker is using "
+            "PowerShell for post-exploitation, downloading additional tools, and "
+            "pivoting toward the production database (db-01) to exfiltrate customer "
+            "records. The initial alert has HIGH confidence but the source appears to "
+            "be a legitimate update process, making triage critical. Two false "
+            "positives from routine update checks add noise."
+        ),
+        difficulty=Difficulty.HARD,
+        threat_count=4,
+        false_positive_count=2,
+        max_steps=30,
+        adversary_behavior="evasive",
+        mitre_techniques_covered=[
+            "T1195.002", "T1059.001", "T1105", "T1041",
+        ],
+        attack_phases=[
+            AttackPhase(
+                phase_id="supply-01",
+                name="Trojaned Update Execution",
+                description="Backdoored software update executed on app-01 via trusted channel",
+                target_node_id="app-01",
+                attack_type=AlertType.MALWARE,
+                steps_to_complete=3,
+                is_active=True,
+                mitre_technique_id="T1195.002",
+                mitre_technique_name="Supply Chain Compromise: Compromise Software Supply Chain",
+                mitre_tactic="initial-access",
+                c2_ip_pool=["198.51.100.88", "203.0.113.99"],
+            ),
+            AttackPhase(
+                phase_id="supply-02",
+                name="PowerShell Post-Exploitation",
+                description="Backdoor using PowerShell to enumerate internal network from app-01",
+                target_node_id="app-01",
+                attack_type=AlertType.PRIVILEGE_ESCALATION,
+                steps_to_complete=4,
+                is_active=False,
+                prerequisite_phase_id="supply-01",
+                mitre_technique_id="T1059.001",
+                mitre_technique_name="Command and Scripting Interpreter: PowerShell",
+                mitre_tactic="execution",
+                recompromise_delay=3,
+            ),
+            AttackPhase(
+                phase_id="supply-03",
+                name="Ingress Tool Transfer",
+                description="Downloading additional tools (Cobalt Strike beacon) to app-01",
+                target_node_id="app-01",
+                attack_type=AlertType.INTRUSION,
+                steps_to_complete=4,
+                is_active=False,
+                prerequisite_phase_id="supply-02",
+                mitre_technique_id="T1105",
+                mitre_technique_name="Ingress Tool Transfer",
+                mitre_tactic="command-and-control",
+            ),
+            AttackPhase(
+                phase_id="supply-04",
+                name="Database Exfiltration",
+                description="Pivoting from app-01 to db-01, exfiltrating customer records via HTTPS",
+                target_node_id="db-01",
+                attack_type=AlertType.EXFILTRATION,
+                steps_to_complete=6,
+                exfiltration_rate_mb=8.0,
+                is_active=False,
+                prerequisite_phase_id="supply-03",
+                mitre_technique_id="T1041",
+                mitre_technique_name="Exfiltration Over C2 Channel",
+                mitre_tactic="exfiltration",
+                c2_ip_pool=["198.51.100.88", "203.0.113.99"],
+            ),
+        ],
+        initial_compromised_nodes=["app-01"],
+    ),
 }
 
 

@@ -32,11 +32,12 @@ class CyberRangeEnvironment(MCPEnvironment):
     Each tool call advances the simulation: the attacker progresses,
     new alerts may fire, and the agent receives a reward signal.
 
-    Supports 5 task scenarios:
+    Supports 6 task scenarios:
         - script_kiddie (easy): Single brute-force attack
         - phishing_campaign (medium): Multi-host phishing with false positives
         - apt_lateral_movement (hard): Full APT kill chain
         - ransomware_outbreak (hard): Time-critical ransomware lateral spread
+        - supply_chain_compromise (hard): Trojaned software update with C2
         - insider_threat_apt (nightmare): Dual simultaneous threat
 
     Each scenario has a deterministic grader producing scores from 0.0 to 1.0.

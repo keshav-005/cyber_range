@@ -2,7 +2,7 @@
 
 **An OpenEnv environment for training AI agents as SOC (Security Operations Center) analysts — featuring adaptive adversaries, MITRE ATT&CK-aligned attack chains, and multi-objective grading.**
 
-CyberRange drops an AI agent into a simulated 12-node enterprise network under active cyber attack. The agent must triage SIEM alerts, investigate threats via forensic analysis, distinguish real incidents from false positives, and execute defensive actions — all under budget and time constraints. Five scenarios span four difficulty levels, from a simple brute-force attempt to a simultaneous insider + APT nightmare with an **adaptive adversary** that rotates C2 infrastructure and persists through incomplete remediation.
+CyberRange drops an AI agent into a simulated 12-node enterprise network under active cyber attack. The agent must triage SIEM alerts, investigate threats via forensic analysis, distinguish real incidents from false positives, and execute defensive actions — all under budget and time constraints. Six scenarios span four difficulty levels, from a simple brute-force attempt to a simultaneous insider + APT nightmare with an **adaptive adversary** that rotates C2 infrastructure and persists through incomplete remediation.
 
 Built on the [OpenEnv](https://github.com/meta-pytorch/openenv) framework using FastMCP for tool-based interaction.
 
@@ -16,7 +16,7 @@ Built on the [OpenEnv](https://github.com/meta-pytorch/openenv) framework using 
 | `inference.py` | ✅ Passed | OpenAI client, `[START]/[STEP]/[END]` structured output |
 | `Dockerfile` | ✅ Passed | Multi-stage build, HEALTHCHECK, EXPOSE 8000 |
 | `uv.lock` | ✅ Passed | Locked dependencies for reproducible builds |
-| 3+ Tasks with graders | ✅ Passed | 5 scenarios, deterministic grading (seed=42) |
+| 3+ Tasks with graders | ✅ Passed | 6 scenarios, deterministic grading (seed=42) |
 | 10+ MCP tools | ✅ Passed | observe, investigate, isolate, block, forensics, patch, restore, dismiss, honeypot, escalate |
 | Typed models | ✅ Passed | Pydantic `Observation`, `State`, `Action` |
 | Pre-submission validation | ✅ **43/43** | All structural, import, and grader checks pass |
@@ -36,7 +36,7 @@ Built on the [OpenEnv](https://github.com/meta-pytorch/openenv) framework using 
 | **False Positive Handling** | Graded component (20% of score) with forensic evidence | Not tested |
 | **Grading Dimensions** | 5-component weighted scoring (threat, FP, data, collateral, efficiency) | Binary pass/fail |
 | **Dual Simultaneous Threats** | Insider + External APT running in parallel | Single threat |
-| **Scenario Count** | 5 scenarios across 4 difficulty tiers | 1-2 scenarios |
+| **Scenario Count** | 6 scenarios across 4 difficulty tiers | 1-2 scenarios |
 | **Budget Management** | Finite action budget forces strategic trade-offs | Unlimited actions |
 | **RL Training Ready** | GRPO reward function, dense step-level rewards | End-of-episode only |
 
@@ -44,17 +44,18 @@ Built on the [OpenEnv](https://github.com/meta-pytorch/openenv) framework using 
 
 ## MITRE ATT&CK Coverage
 
-CyberRange tests agent performance across **7 ATT&CK Tactics** and **12 unique Techniques**:
+CyberRange tests agent performance across **8 ATT&CK Tactics** and **16 unique Techniques**:
 
 | Tactic | Techniques Tested | Scenarios |
 |--------|------------------|-----------|
-| **Initial Access** | T1190 (Exploit Public-Facing App), T1566.001 (Spearphishing Attachment) | APT, Phishing, Insider+APT |
-| **Execution** | T1204.002 (User Execution: Malicious File) | Phishing |
+| **Initial Access** | T1190 (Exploit Public-Facing App), T1566.001 (Spearphishing), T1195.002 (Supply Chain Compromise) | APT, Phishing, Insider+APT, Supply Chain |
+| **Execution** | T1204.002 (User Execution: Malicious File), T1059.001 (PowerShell) | Phishing, Supply Chain |
 | **Credential Access** | T1110.001 (Brute Force), T1003.001 (LSASS Memory Dump) | Script Kiddie, APT, Insider+APT |
 | **Lateral Movement** | T1021.002 (SMB/Windows Admin Shares) | Phishing, APT, Ransomware, Insider+APT |
-| **Privilege Escalation** | T1078.002 (Valid Accounts: Domain) | APT, Insider+APT |
+| **Privilege Escalation** | T1078.002 (Valid Accounts: Domain) | APT, Insider+APT, Supply Chain |
 | **Collection** | T1074.001 (Local Data Staging) | Insider+APT |
-| **Exfiltration** | T1041 (Exfil Over C2), T1567.002 (Exfil to Cloud Storage) | APT, Insider+APT |
+| **Command & Control** | T1105 (Ingress Tool Transfer) | Supply Chain |
+| **Exfiltration** | T1041 (Exfil Over C2), T1567.002 (Exfil to Cloud Storage) | APT, Insider+APT, Supply Chain |
 | **Impact** | T1486 (Data Encrypted for Impact), T1489 (Service Stop), T1490 (Inhibit System Recovery) | Ransomware |
 
 ---
@@ -139,7 +140,16 @@ This forces agents to think beyond simple "block and move on" strategies — the
 | **Adversary** | Persistent |
 | **Kill Chain** | `ws-01 encrypted → ws-02 → app-01 → backup-01 (game over)` |
 
-### 5. Insider + External APT — `insider_threat_apt`
+### 5. Supply Chain Compromise — `supply_chain_compromise`
+| | |
+|---|---|
+| **Difficulty** | 🔴 Hard |
+| **Max Steps** | 30 |
+| **MITRE Techniques** | T1195.002, T1059.001, T1105, T1041 |
+| **Adversary** | Evasive (C2 IP rotation) |
+| **Kill Chain** | `Trojaned Update → PowerShell Post-Exploitation → Tool Transfer → Database Exfiltration (8 MB/step)` |
+
+### 6. Insider + External APT — `insider_threat_apt`
 | | |
 |---|---|
 | **Difficulty** | 💀 Nightmare |
@@ -156,12 +166,13 @@ Measured with `seed=42` for full reproducibility:
 
 | Scenario | Difficulty | MITRE Techniques | Heuristic Agent | Adversary Type |
 |----------|------------|-----------------|-----------------|----------------|
-| Script Kiddie | 🟢 Easy | 1 | **0.800** | Static |
+| Script Kiddie | 🟢 Easy | 1 | **1.000** | Static |
 | Phishing Campaign | 🟡 Medium | 3 | **0.650** | Evasive |
-| APT Kill Chain | 🔴 Hard | 5 | **0.627** | Evasive |
-| Ransomware Outbreak | 🔴 Hard | 4 | **0.590** | Persistent |
+| APT Kill Chain | 🔴 Hard | 5 | **0.593** | Evasive |
+| Ransomware Outbreak | 🔴 Hard | 4 | **0.650** | Persistent |
+| Supply Chain Attack | 🔴 Hard | 4 | **0.912** | Evasive |
 | Insider + APT | 💀 Nightmare | 7 | **0.569** | Adaptive |
-| | | | **Avg: 0.647** | |
+| | | | **Avg: 0.729** | |
 
 **Reproduce with:**
 ```bash
@@ -274,7 +285,7 @@ Compatible with:
 ## Run Demos
 
 ```bash
-python run_demo.py                     # Full benchmark (all 5 scenarios)
+python run_demo.py                     # Full benchmark (all 6 scenarios)
 python run_demo.py --quick             # Easy + Medium only
 python run_demo.py --scenario apt      # APT scenario only
 python run_demo.py --fast              # Skip step-by-step output
@@ -293,13 +304,14 @@ Output:
   ✅ PASS  Load apt_lateral_movement
   ✅ PASS  Load ransomware_outbreak
   ✅ PASS  Load insider_threat_apt
+  ✅ PASS  Load supply_chain_compromise
   ✅ PASS  Tool: observe_network
   ✅ PASS  Deterministic grading
   ✅ PASS  Seed reproducibility
-  ✅ PASS  MITRE ATT&CK coverage (12 techniques mapped)
-  ✅ PASS  Adaptive adversary (4 scenarios have adaptive adversaries)
+  ✅ PASS  MITRE ATT&CK coverage (16 techniques mapped)
+  ✅ PASS  Adaptive adversary (5 scenarios have adaptive adversaries)
 
-  Results: 11/11 tests passed
+  Results: 12/12 tests passed
   🎉 All tests passed! Environment is ready for training.
 ```
 
@@ -341,7 +353,7 @@ cyber_range/
 │   ├── app.py                     # FastAPI entry point
 │   ├── cyber_environment.py       # MCPEnvironment — 10 tools, reset/step/state
 │   ├── network_simulator.py       # 12-node topology, host management, forensics
-│   ├── attack_engine.py           # 5 MITRE-aligned scenarios, adaptive adversary, grading
+│   ├── attack_engine.py           # 6 MITRE-aligned scenarios, adaptive adversary, grading
 │   ├── reward_calculator.py       # Multi-objective reward function
 │   └── Dockerfile                 # Multi-stage Docker build
 ├── examples/
@@ -386,7 +398,7 @@ CyberRange provides **step-level reward signals** (not just end-of-episode), ena
 
 | Criterion (Weight) | How CyberRange Addresses It |
 |---|---|
-| **Environment Innovation (40%)** | Adaptive adversary with C2 rotation, MITRE ATT&CK alignment, 5 scenarios with 4 difficulty tiers, dual simultaneous threats, budget management. First SOC environment with reactive adversaries. |
+| **Environment Innovation (40%)** | Adaptive adversary with C2 rotation, MITRE ATT&CK alignment, 6 scenarios with 4 difficulty tiers, dual simultaneous threats, budget management. First SOC environment with reactive adversaries. |
 | **Storytelling (30%)** | Comprehensive README, `run_demo.py` with Rich terminal UI, benchmark suite, training pipeline, 12-node network topology visualization. Real-world SOC scenario framing. |
 | **Training Results (20%)** | `train_baseline.py` with GRPO reward function, heuristic baseline scores across all scenarios, MITRE coverage metrics. Environment-in-the-loop training loop. |
 | **Code Quality (10%)** | Clean architecture, full type hints, docstrings, pip-installable, OpenEnv 0.2.2 compatible, 43 validation checks, pytest suite. |

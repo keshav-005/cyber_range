@@ -169,6 +169,9 @@ MITRE_TECHNIQUES = {
     "T1486": ("Data Encryption", "Impact"),
     "T1490": ("Inhibit Recovery", "Impact"),
     "T1489": ("Service Stop", "Impact"),
+    "T1195.002": ("Supply Chain", "Initial Access"),
+    "T1059.001": ("PowerShell", "Execution"),
+    "T1105": ("Tool Transfer", "Command & Control"),
 }
 
 
@@ -306,6 +309,7 @@ SCENARIOS = {
     "phishing_campaign": ("🟡 Phishing Campaign Triage", "medium"),
     "apt_lateral_movement": ("🔴 APT Kill Chain", "hard"),
     "ransomware_outbreak": ("🔴 Ransomware Outbreak", "hard"),
+    "supply_chain_compromise": ("🔴 Supply Chain Attack", "hard"),
     "insider_threat_apt": ("💀 Insider + External APT", "nightmare"),
 }
 
@@ -600,7 +604,7 @@ with gr.Blocks(
     **Built for the [Meta PyTorch × Scaler OpenEnv Hackathon](https://unstop.com)** |
     [GitHub](https://github.com/keshav-005/cyber_range) |
     [OpenEnv 0.2.2](https://github.com/meta-pytorch/openenv) |
-    5 scenarios · 12 techniques · Adaptive adversary · Seed: 42
+    6 scenarios · 16 techniques · Adaptive adversary · Seed: 42
     """)
 
 if __name__ == "__main__":

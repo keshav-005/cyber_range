@@ -205,7 +205,7 @@ class TestRunForensics:
         result = network.run_forensics("ws-01")
         assert result.success
         assert result.details["malware_found"] is True
-        assert len(result.details["suspicious_processes"]) > 0
+        assert len(result.details["process_tree"]) > 0
 
     def test_forensics_nonexistent_fails(self, network):
         result = network.run_forensics("fake-99")
